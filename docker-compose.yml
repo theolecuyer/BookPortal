@@ -1,17 +1,49 @@
-version: "3"
 services:
-  book-portal-be:
-    image: ugurcanerdogan/book-portal-be:latest
-    container_name: "book-portal-be"
+    db:
+        image: mysql:8.0
+        container_name: "book-portal-db"
+        environment:
+            MYSQL_DATABASE: book_portal
+            MYSQL_USER: bookportal
+            MYSQL_PASSWORD: localdev123
+            MYSQL_ROOT_PASSWORD: localroot123
+        volumes:
+            - db-data:/var/lib/mysql
+        healthcheck:
+            test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-plocalroot123"]
+            interval: 5s
+            timeout: 5s
+            retries: 20
 
-  book-portal-fe:
-    image: ugurcanerdogan/book-portal-fe:latest
-    container_name: "book-portal-fe"
-    depends_on:
-      - book-portal-be
-  proxy:
-    image: ugurcanerdogan/book-portal-proxy:latest
-    container_name: "book-portal-proxy"
-    restart: always
-    ports:
-      - "80:80"
+    book-portal-be:
+        build: ./book-portal-be
+        image: tglecuyer/book-portal-be:latest
+        platform: linux/amd64
+        container_name: "book-portal-be"
+        environment:
+            SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/book_portal?useSSL=false&allowPublicKeyRetrieval=true
+            SPRING_DATASOURCE_USERNAME: bookportal
+            SPRING_DATASOURCE_PASSWORD: localdev123
+        depends_on:
+            db:
+                condition: service_healthy
+
+    book-portal-fe:
+        build: ./book-portal-fe
+        image: tglecuyer/book-portal-fe:latest
+        platform: linux/amd64
+        container_name: "book-portal-fe"
+        depends_on:
+            - book-portal-be
+
+    proxy:
+        build: ./nginx
+        image: tglecuyer/book-portal-proxy:latest
+        platform: linux/amd64
+        container_name: "book-portal-proxy"
+        restart: always
+        ports:
+            - "80:80"
+
+volumes:
+    db-data:
